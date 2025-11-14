@@ -1,3 +1,4 @@
+// src/components/Dashboard.tsx
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from './ui/button';
@@ -5,38 +6,60 @@ import { LogOut, MessageSquare, Database, Check } from 'lucide-react';
 import { OneDriveFileBrowser } from './OneDriveFileBrowser';
 import { ChatInterface } from './ChatInterface';
 import { OneDriveIcon } from './icons/OneDriveIcon';
-import { PublicClientApplication } from '@azure/msal-browser';
-import { graphScopes } from '../config/authConfig';
+import { PublicClientApplication, InteractionRequiredAuthError } from '@azure/msal-browser';
+import { apiScope, graphScopes } from '../config/authConfig';
 
 interface DashboardProps {
   userName: string;
+  userEmail: string;
   msalInstance: PublicClientApplication;
+  graphScopes: string[];
+  apiScope: string[];
   onLogout: () => void;
 }
 
 type ViewMode = 'chat' | 'onedrive';
 
-export function Dashboard({ userName, msalInstance, onLogout }: DashboardProps) {
+export function Dashboard({ userName, userEmail, msalInstance, graphScopes, apiScope, onLogout }: DashboardProps) {
   const [currentView, setCurrentView] = useState<ViewMode>('chat');
   const [isConnected, setIsConnected] = useState(false);
-  const [accessToken, setAccessToken] = useState<string>('');
   const [isConnecting, setIsConnecting] = useState(false);
+  // Optional: keep a graph token locally if you plan to reuse it in the UI.
+  const [graphToken, setGraphToken] = useState<string | null>(null);
 
   const handleConnectOneDrive = async () => {
     setIsConnecting(true);
     try {
       const accounts = msalInstance.getAllAccounts();
-      if (accounts.length === 0) {
+      if (!accounts || accounts.length === 0) {
         throw new Error('No accounts found');
       }
 
-      // Request OneDrive permissions
-      const response = await msalInstance.acquireTokenPopup({
-        scopes: graphScopes.onedrive,
-        account: accounts[0]
-      });
+      // Acquire Graph token (Files.Read) to ensure consent/permissions for OneDrive
+      // Use the graphScopes array (not graphScopes.onedrive)
+      let resp;
+      try {
+        resp = await msalInstance.acquireTokenSilent({
+          scopes: graphScopes,
+          account: accounts[0],
+        });
+      } catch (err: any) {
+        // Fallback to popup if silent fails
+        if (err instanceof InteractionRequiredAuthError) {
+          resp = await msalInstance.acquireTokenPopup({
+            scopes: graphScopes,
+            account: accounts[0],
+          });
+        } else {
+          throw err;
+        }
+      }
 
-      setAccessToken(response.accessToken);
+      // resp may be undefined if something unexpected happened
+      if (resp && resp.accessToken) {
+        setGraphToken(resp.accessToken); // optional: store for UI or ad-hoc calls
+      }
+
       setIsConnected(true);
       setCurrentView('onedrive');
     } catch (error) {
@@ -51,10 +74,15 @@ export function Dashboard({ userName, msalInstance, onLogout }: DashboardProps) 
     const accounts = msalInstance.getAllAccounts();
     if (accounts.length > 0) {
       msalInstance.logoutPopup({
-        account: accounts[0]
+        account: accounts[0],
       }).then(() => {
         onLogout();
+      }).catch((e) => {
+        console.error("Logout failed:", e);
+        onLogout();
       });
+    } else {
+      onLogout();
     }
   };
 
@@ -213,7 +241,7 @@ export function Dashboard({ userName, msalInstance, onLogout }: DashboardProps) 
             >
               <div className="max-w-7xl mx-auto px-8 py-8">
                 {isConnected ? (
-                  <OneDriveFileBrowser accessToken={accessToken} />
+                  <OneDriveFileBrowser msalInstance={msalInstance} graphScopes={graphScopes} apiScope={apiScope} userName={userName} userEmail={userEmail} />
                 ) : (
                   <div className="flex flex-col items-center justify-center min-h-[60vh]">
                     <OneDriveIcon className="w-24 h-24 mb-6 opacity-60" />

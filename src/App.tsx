@@ -4,7 +4,29 @@ import { AnimatedBackground } from './components/AnimatedBackground';
 import { Button } from './components/ui/button';
 import { Dashboard } from './components/Dashboard';
 import { PublicClientApplication } from '@azure/msal-browser';
-import { msalConfig, loginRequest } from './config/authConfig';
+import { msalConfig, loginRequest, graphScopes, apiScope } from './config/authConfig';
+import { InteractionRequiredAuthError } from "@azure/msal-browser";
+
+async function getApiToken(msalInstance) {
+  const account = msalInstance.getAllAccounts()[0];
+  if (!account) throw new Error("No signed-in account found");
+
+  try {
+    const silentResult = await msalInstance.acquireTokenSilent({
+      scopes: apiScope,
+      account,
+    });
+    return silentResult.accessToken;
+  } catch (err) {
+    if (err instanceof InteractionRequiredAuthError) {
+      const popupResult = await msalInstance.acquireTokenPopup({
+        scopes: apiScope,
+      });
+      return popupResult.accessToken;
+    }
+    throw err;
+  }
+}
 
 // Initialize MSAL
 const msalInstance = new PublicClientApplication(msalConfig);
@@ -12,6 +34,8 @@ const msalInstance = new PublicClientApplication(msalConfig);
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userName, setUserName] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+  const [accessToken, setAccessToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
 
@@ -24,12 +48,16 @@ export default function App() {
           // User just logged in
           setIsAuthenticated(true);
           setUserName(response.account?.name || 'User');
+          setUserEmail(response.account?.username || '');
+          setAccessToken(response.accessToken || '');
         } else {
           // Check if user is already logged in
           const accounts = msalInstance.getAllAccounts();
           if (accounts.length > 0) {
             setIsAuthenticated(true);
             setUserName(accounts[0].name || 'User');
+            setUserEmail(accounts[0].username || '');
+            // accessToken will be set after OneDrive connect
           }
         }
         setIsInitializing(false);
@@ -43,6 +71,8 @@ export default function App() {
       const response = await msalInstance.loginPopup(loginRequest);
       setIsAuthenticated(true);
       setUserName(response.account?.name || 'User');
+      setUserEmail(response.account?.username || '');
+      setAccessToken(response.accessToken || '');
     } catch (error) {
       console.error('Login failed:', error);
     } finally {
@@ -69,7 +99,10 @@ export default function App() {
     return (
       <Dashboard 
         userName={userName} 
+        userEmail={userEmail}
         msalInstance={msalInstance}
+        graphScopes={graphScopes}
+        apiScope={apiScope}
         onLogout={handleLogout}
       />
     );
