@@ -2,9 +2,10 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from './ui/button';
-import { LogOut, MessageSquare, Database, Check } from 'lucide-react';
+import { LogOut, MessageSquare, Database, Check, Upload } from 'lucide-react';
 import { OneDriveFileBrowser } from './OneDriveFileBrowser';
 import { ChatInterface } from './ChatInterface';
+import { ManualUpload } from './ManualUpload';
 import { OneDriveIcon } from './icons/OneDriveIcon';
 import { PublicClientApplication, InteractionRequiredAuthError } from '@azure/msal-browser';
 import { apiScope, graphScopes } from '../config/authConfig';
@@ -18,7 +19,7 @@ interface DashboardProps {
   onLogout: () => void;
 }
 
-type ViewMode = 'chat' | 'onedrive';
+type ViewMode = 'chat' | 'onedrive' | 'manual-upload';
 
 export function Dashboard({ userName, userEmail, msalInstance, graphScopes, apiScope, onLogout }: DashboardProps) {
   const [currentView, setCurrentView] = useState<ViewMode>('chat');
@@ -213,11 +214,31 @@ export function Dashboard({ userName, userEmail, msalInstance, graphScopes, apiS
               </div>
             </div>
           </button>
+
+          {/* Manual Upload Tab */}
+          <button
+            onClick={() => handleViewChange('manual-upload')}
+            className={`px-6 py-4 border-b-2 transition-all duration-300 ${
+              currentView === 'manual-upload'
+                ? 'border-white text-white'
+                : 'border-transparent text-white/50 hover:text-white/70'
+            }`}
+            style={{
+              fontFamily: 'Inter, system-ui, sans-serif',
+              fontWeight: 300,
+              fontSize: '0.9375rem'
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <Upload className="w-4 h-4" />
+              <span>Manual Upload</span>
+            </div>
+          </button>
         </div>
       </motion.div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden">
         <AnimatePresence mode="wait">
           {currentView === 'chat' ? (
             <motion.div
@@ -226,9 +247,20 @@ export function Dashboard({ userName, userEmail, msalInstance, graphScopes, apiS
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.3 }}
-              className="h-full"
+              className="h-full overflow-hidden"
             >
-              <ChatInterface />
+              <ChatInterface msalInstance={msalInstance} apiScope={apiScope} />
+            </motion.div>
+          ) : currentView === 'manual-upload' ? (
+            <motion.div
+              key="manual-upload"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="h-full overflow-auto"
+            >
+              <ManualUpload msalInstance={msalInstance} apiScope={apiScope} />
             </motion.div>
           ) : (
             <motion.div

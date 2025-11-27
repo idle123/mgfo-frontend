@@ -8,6 +8,8 @@ import { toast } from "sonner@2.0.3";
 import { Toaster } from "./ui/sonner";
 // import { ingestData } from '../api/ingest'; // optional, see usage below
 import { InteractionRequiredAuthError } from "@azure/msal-browser";
+import { INGEST_ENDPOINT } from "../config/apiConfig";
+import { TENANT_ID } from "../config/authConfig";
 
 interface DriveItem {
   id: string;
@@ -37,7 +39,7 @@ export function OneDriveFileBrowser({
   graphScopes,
   userName,
   userEmail,
-  ingestEndpoint = "http://localhost:8000/ingest_onedrive",
+  ingestEndpoint = INGEST_ENDPOINT,
   ingestData,
 }: OneDriveFileBrowserProps) {
   const [items, setItems] = useState<DriveItem[]>([]);
@@ -314,15 +316,15 @@ const fetchRootItems = async () => {
       const apiToken = await getApiToken();
       if (!apiToken) throw new Error("Unable to acquire API token");
 
-      // Prepare form data (send only userName, userEmail, documents)
+      // Prepare form data (send userName, userEmail, documents, tenant_id)
       const form = new FormData();
       form.append("userName", userName);
       form.append("userEmail", userEmail);
       form.append("documents", JSON.stringify(selectedDocs));
-      // Optionally: tenant_id, access_tags, etc.
-      // form.append("tenant_id", "");
-      // form.append("access_tags", "investments,dealflow");
-      console.log ("Prepared form data for ingestion:", { userName, userEmail, documents: selectedDocs });
+      form.append("tenant_id", TENANT_ID); // Required for multi-tenant isolation
+      // Optional: access_tags for RBAC
+      // form.append("access_tags", JSON.stringify(["investments", "dealflow"]));
+      console.log ("Prepared form data for ingestion:", { userName, userEmail, documents: selectedDocs, tenant_id: TENANT_ID });
       // POST to backend with Authorization header (API token)
       const resp = await fetch(ingestEndpoint, {
         method: "POST",

@@ -55,7 +55,9 @@
       outDir: 'build',
     },
     server: {
+      host: '0.0.0.0', // Bind to all network interfaces
       port: 3000,
-      open: true,
+      open: false, // Don't auto-open browser
+      strictPort: true, // Fail if port is already in use
     },
   });

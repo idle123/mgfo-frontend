@@ -1,11 +1,17 @@
 // src/config/authConfig.ts
 
+import { FRONTEND_URL } from './apiConfig';
+
+// Azure AD Tenant ID - extracted from authority URL
+// This is used for multi-tenant isolation in the backend
+export const TENANT_ID = "a6874e29-7cb4-4303-a2ad-ac96fcb0012b";
+
 export const msalConfig = {
   auth: {
     clientId: "653b929d-0932-4290-af54-92d1bd32756a", // frontend app (SPA) client id
     // Authority should be the tenant endpoint (ok to use tenant id here)
-    authority: "https://login.microsoftonline.com/a6874e29-7cb4-4303-a2ad-ac96fcb0012b",
-    redirectUri: "http://localhost:3000",
+    authority: `https://login.microsoftonline.com/${TENANT_ID}`,
+    redirectUri: FRONTEND_URL,
   },
   cache: {
     cacheLocation: "sessionStorage" as const,
